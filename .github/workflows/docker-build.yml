@@ -2,6 +2,8 @@
 name: Build & Push
 # ... (rest of the file remains the same)
 
+on:
+
 jobs:
   build:
     runs-on: ubuntu-latest
