@@ -3,29 +3,21 @@ name: Build & Push
 # ... (rest of the file remains the same)
 
 on:
-  # This section defines the manual trigger
   pull_request:
-      branches: [ "main" ] # Often filtered to PRs targeting the default branch
-
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 👇 ADD THIS BLOCK TO FIX THE 'DENIED' ERROR
     permissions:
       contents: read
-      packages: write # This grants permission to push to GHCR
-    # 👆 END OF FIX
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      # --- Step to Lowercase Repository ---
       - name: Set repository to lowercase
         id: slug
-        # NOTE: This line needs to use the repository variable, not IMAGE_TAG
-        # And the output variable should be used in the tags line.
         run: echo "DOCKER_REPOSITORY=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
-      # ---------------------------------------
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -38,6 +30,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          # This remains 'false' for pull_request events, preventing the push.
           push: ${{ github.event_name != 'pull_request' }}
-          # Use the repository variable and the input tag
-          tags: ghcr.io/${{ env.DOCKER_REPOSITORY }}:${{ github.event.inputs.image_tag }}
+          # FIX: Use a valid tag like the commit SHA instead of an empty input variable.
+          tags: ghcr.io/${{ env.DOCKER_REPOSITORY }}:${{ github.sha }}
