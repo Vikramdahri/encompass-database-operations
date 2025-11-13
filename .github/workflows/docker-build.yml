@@ -4,9 +4,8 @@ name: Build & Push
 
 on:
   # This section defines the manual trigger
-  push:
-      branches:
-        - main # Runs after any push to main, including a merge from a PR.
+  pull_request:
+      branches: [ "main" ] # Often filtered to PRs targeting the default branch
 
 
 jobs:
