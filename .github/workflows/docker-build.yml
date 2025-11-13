@@ -3,27 +3,21 @@ name: Build & Push
 # ... (rest of the file remains the same)
 
 on:
-  # This section defines the manual trigger
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Image tag to use (e.g., latest, v1.0.0)'
-        required: true
-        default: 'latest'
-        type: 'string'
-
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      # --- New Step to Lowercase Repository ---
       - name: Set repository to lowercase
         id: slug
-        run: echo "IMAGE_TAG=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
-      # ---------------------------------------
+        run: echo "DOCKER_REPOSITORY=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -36,6 +30,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          # This remains 'false' for pull_request events, preventing the push.
           push: ${{ github.event_name != 'pull_request' }}
-          # 💡 FIX: Use the new lowercase environment variable
-          tags: ghcr.io/${{ env.IMAGE_TAG }}:latest
+          # FIX: Use a valid tag like the commit SHA instead of an empty input variable.
+          tags: ghcr.io/${{ env.DOCKER_REPOSITORY }}:${{ github.sha }}
