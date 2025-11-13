@@ -4,25 +4,28 @@ name: Build & Push
 
 on:
   # This section defines the manual trigger
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Image tag to use (e.g., latest, v1.0.0)'
-        required: true
-        default: 'latest'
-        type: 'string'
+  push:
+      branches:
+        - main # Runs after any push to main, including a merge from a PR.
 
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 👇 ADD THIS BLOCK TO FIX THE 'DENIED' ERROR
+    permissions:
+      contents: read
+      packages: write # This grants permission to push to GHCR
+    # 👆 END OF FIX
     steps:
       - uses: actions/checkout@v4
 
-      # --- New Step to Lowercase Repository ---
+      # --- Step to Lowercase Repository ---
       - name: Set repository to lowercase
         id: slug
-        run: echo "IMAGE_TAG=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+        # NOTE: This line needs to use the repository variable, not IMAGE_TAG
+        # And the output variable should be used in the tags line.
+        run: echo "DOCKER_REPOSITORY=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
       # ---------------------------------------
 
       - name: Login to GHCR
@@ -37,5 +40,5 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          # 💡 FIX: Use the new lowercase environment variable
-          tags: ghcr.io/${{ env.IMAGE_TAG }}:latest
+          # Use the repository variable and the input tag
+          tags: ghcr.io/${{ env.DOCKER_REPOSITORY }}:${{ github.event.inputs.image_tag }}
