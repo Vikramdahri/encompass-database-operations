@@ -34,6 +34,5 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          # Only push on workflow_dispatch, not on pull_request
-          push: ${{ github.event_name == 'workflow_dispatch' }}
+          push: true
           tags: ${{ env.IMAGE_TAG }}
