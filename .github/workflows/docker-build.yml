@@ -39,6 +39,3 @@ jobs:
           # This remains 'false' for pull_request events, preventing the push.
           push: true
           # FIX: Use a valid tag like the commit SHA instead of an empty input variable.
-          tags: |
-            ghcr.io/${{ env.DOCKER_REPOSITORY }}:latest
-            ghcr.io/${{ env.DOCKER_REPOSITORY }}:${{ github.sha }}
