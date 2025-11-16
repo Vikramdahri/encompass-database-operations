@@ -5,6 +5,8 @@ name: Build & Push
 on:
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:  # This line makes it manually runnable
+
 
 jobs:
   build:
@@ -12,6 +14,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+    env:
+      IMAGE_TAG: ghcr.io/vikramdahri/mysql-exporter:latest   # ← exactly what you want!
+
     steps:
       - uses: actions/checkout@v4
 
