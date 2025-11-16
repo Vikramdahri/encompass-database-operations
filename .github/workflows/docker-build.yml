@@ -5,7 +5,7 @@ name: Build & Push
 on:
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch:  # This line makes it manually runnable
+  workflow_dispatch:  # This line makes it manually runnables
 
 
 jobs:
