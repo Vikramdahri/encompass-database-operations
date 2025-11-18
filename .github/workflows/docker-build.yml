@@ -1,10 +1,10 @@
 # .github/workflows/docker-build.yml
 name: Build & Push
-# ... (rest of the file remains the same)
 
 on:
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:  # This line makes it manually runnable
 
 jobs:
   build:
@@ -12,6 +12,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+    env:
+      IMAGE_TAG: ghcr.io/vikramdahri/mysql-exporter:latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +34,5 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          # This remains 'false' for pull_request events, preventing the push.
           push: true
-          # FIX: Use a valid tag like the commit SHA instead of an empty input variable.
-          tags: ghcr.io/${{ env.DOCKER_REPOSITORY }}:${{ github.sha }}
+          tags: ${{ env.IMAGE_TAG }}
