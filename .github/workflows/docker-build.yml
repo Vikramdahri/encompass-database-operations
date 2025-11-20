@@ -43,5 +43,5 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pullкоп_request' }}
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository_name }}/mysql-exporter:latest
+          push: true
+          tags: ghcr.io/${{ env.REPO }}/mysql-exporter:latest
