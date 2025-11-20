@@ -1,13 +1,28 @@
-# .github/workflows/docker-build.yml
-name: Build & Push
+name: CI - Lint & Build Docker
 
 on:
-  push:                 # Every push to any branch
-  workflow_dispatch:    # Manual trigger
+  push:
+    branches: [ main ]
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3     # official action
+
+      - name: Lint with ruff
+        run: uvx ruff check .           # uvx = run without creating a venv
+
+      - name: Format check with ruff
+        run: uvx ruff format --check .  # replaces Black
+
+  build-and-push:
+    needs: lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,9 +30,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Lowercase repo
-        run: echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -30,5 +42,5 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          tags: ghcr.io/${{ env.REPO }}/mysql-exporter:latest
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository_name }}/mysql-exporter:latest
