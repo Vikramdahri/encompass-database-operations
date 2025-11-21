@@ -1,4 +1,4 @@
-name: Build & Push mysql-exporter
+name: mysql-exporter-docker
 
 on:
   push:
