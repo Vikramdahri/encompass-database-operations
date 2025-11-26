@@ -47,6 +47,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: mysql-json-exporter:latest
-          #tags: ghcr.io/${{ github.repository_owner }}${{ github.repository }}/mysql-exporter:latest
-          #tags: ghcr.io/${{ env.REPO_LOWER }}/mysql-exporter:latest
+          #tags: ghcr.io/${{ github.repository_owner }}${{ github.repository }}/mysql-exporter:latest dsfsdfds
+          tags: ghcr.io/${{ env.REPO_LOWER }}/mysql-exporter:latest
