@@ -171,10 +171,13 @@ def heartbeat(total, stop, start):
         logger.info(f"5s Progress: {done:,}/{total:,} ({done/total*100:5.1f}%) │ {speed:6.1f}/s │ ETA {hms(eta)} │ RAM {get_memory_mib():.1f} MiB")
 
 # ============================ CORE PROCESS ============================
-def process_row(rid, blob):
+def process_row(rid, blob, row_ts):
     global processed, errors, total_images
     ok=False; imgs=0; err=""
-    path=os.path.join(OUT_DIRS["json"],f"{rid}.json")
+    # Year/Month directories
+    json_dir = os.path.join(OUT_DIRS["json"], str(row_ts.year), f"{row_ts.month:02}")
+    os.makedirs(json_dir, exist_ok=True)
+    path = os.path.join(json_dir, f"{rid}.json")
     try:
         data=json.loads(blob.decode("utf-8"),strict=False)
         imgs=extract_images(data,rid)
@@ -192,38 +195,64 @@ def process_row(rid, blob):
 # ============================ MAIN ============================
 def main():
     global processed, errors
-    init_csv(); conn=connect_db(); logger.info("DB connected\n")
-    start_id,resume=get_resume_id()
+    init_csv()
+    conn = connect_db()
+    logger.info("DB connected\n")
 
-    cur=conn.cursor(); cur.execute("SELECT COUNT(*) FROM work_order_steps"); total=cur.fetchone()[0]
+    start_id, resume = get_resume_id()
+
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM work_order_steps")
+    total = cur.fetchone()[0]
     cur.execute(f"SELECT COUNT(*) FROM work_order_steps WHERE id>{start_id}" if start_id else
-                "SELECT COUNT(*) FROM work_order_steps"); to_export=cur.fetchone()[0]
+                "SELECT COUNT(*) FROM work_order_steps")
+    to_export = cur.fetchone()[0]
     logger.info(f"Export start: total {total}, to export {to_export}")
 
-    if not to_export: logger.info("Nothing to export."); return
+    if not to_export:
+        logger.info("Nothing to export.")
+        return
 
-    writers=concurrent.futures.ThreadPoolExecutor(2)
-    writers.submit(writer,csv_q,FILES["status"]); writers.submit(writer,err_q,FILES["errors"])
+    # CSV writers
+    writers = concurrent.futures.ThreadPoolExecutor(2)
+    writers.submit(writer, csv_q, FILES["status"])
+    writers.submit(writer, err_q, FILES["errors"])
 
-    stop=Event(); start=time.time()
-    concurrent.futures.ThreadPoolExecutor(1).submit(heartbeat,to_export,stop,start)
+    # Heartbeat thread
+    stop = Event()
+    start_time = time.time()
+    heartbeat_thread = threading.Thread(target=heartbeat, args=(to_export, stop, start_time), daemon=True)
+    heartbeat_thread.start()
 
     try:
-        cur=conn.cursor(buffered=False)
-        q=f"SELECT id,result_steps FROM work_order_steps WHERE id>{start_id} ORDER BY id" if start_id else \
-          "SELECT id,result_steps FROM work_order_steps ORDER BY id"
+        cur = conn.cursor(buffered=False)
+        q = f"SELECT id, result_steps, timestamp FROM work_order_steps WHERE id>{start_id} ORDER BY id" if start_id else \
+            "SELECT id, result_steps, timestamp FROM work_order_steps ORDER BY id"
         cur.execute(q)
-        with concurrent.futures.ThreadPoolExecutor(MAX_WORKERS) as pool:
-            [pool.submit(process_row,i,b) for i,b in cur]
-    finally:
-        cur.close(); conn.close(); stop.set()
-        csv_q.put(None); err_q.put(None); writers.shutdown(wait=True)
 
-    elapsed=time.time()-start
+        BATCH_SIZE = 500
+        with concurrent.futures.ThreadPoolExecutor(MAX_WORKERS) as pool:
+            while True:
+                rows = cur.fetchmany(BATCH_SIZE)
+                if not rows:
+                    break
+                for rid, blob, ts in rows:
+                    pool.submit(process_row, rid, blob, ts)
+
+    finally:
+        cur.close()
+        conn.close()
+        stop.set()
+        heartbeat_thread.join()
+        csv_q.put(None)
+        err_q.put(None)
+        writers.shutdown(wait=True)
+
+    elapsed = time.time() - start_time
     uptime = hms(elapsed)
 
-    json_files = len(os.listdir(OUT_DIRS["json"]))
-    img_files = len(os.listdir(OUT_DIRS["img"]))
+    json_files = sum(len(files) for _, _, files in os.walk(OUT_DIRS["json"]))
+    img_files = sum(len(files) for _, _, files in os.walk(OUT_DIRS["img"]))
     csv_files = sum(1 for f in FILES.values() if f.endswith(".csv"))
     log_files = sum(1 for f in FILES.values() if f.endswith(".log"))
     summary_files = sum(1 for f in FILES.values() if f.endswith(".json"))
@@ -234,14 +263,22 @@ def main():
     logger.info(f"Files Created → JSON: {json_files} | Images: {img_files} | CSV: {csv_files} | Log: {log_files} | Summary: {summary_files}")
     logger.info(f"Peak RAM: {peak_mem:.1f} MiB")
 
-    summary=dict(
-        total=total, processed=processed, resumed=start_id, uptime=uptime,
-        images=total_images, errors=errors, elapsed=round(elapsed,1),
-        rps=round(processed/elapsed,1), peak_ram=round(peak_mem,1),
+    summary = dict(
+        total=total,
+        processed=processed,
+        resumed=start_id,
+        uptime=uptime,
+        images=total_images,
+        errors=errors,
+        elapsed=round(elapsed, 1),
+        rps=round(processed/elapsed, 1),
+        peak_ram=round(peak_mem, 1),
         files_created=dict(json=json_files, images=img_files, csv=csv_files, log=log_files, summary=summary_files),
-        json_dir=OUT_DIRS["json"], img_dir=OUT_DIRS["img"]
+        json_dir=OUT_DIRS["json"],
+        img_dir=OUT_DIRS["img"]
     )
-    with open(FILES["summary"],"w",encoding="utf-8") as f: json.dump(summary,f,indent=2)
+    with open(FILES["summary"], "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2)
 
 if __name__=="__main__":
     main()
